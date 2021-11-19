@@ -51,8 +51,8 @@ async def on_ready():
     for guild in client.guilds:
         if guild.name == GUILD:
             break
-    print(f'{client.user} is connected to the following guild:\n'
-          f'{guild.name}(id: {guild.id})')
+    print(f"{client.user} is connected to the following guild:\n"
+          f"{guild.name}(id: {guild.id})")
 
 """
 Scrape lol esports website for scheduled big region matches once a month.
@@ -84,19 +84,19 @@ async def scrape_schedule():
             # Get each date and their list of matches.
             for d1 in lolSoup.find('div', class_='Event').children:
                 if isinstance(d1, bs4.element.Tag):
-                    if d1.get("class")[0] == "EventDate":
+                    if d1.get('class')[0] == 'EventDate':
                         for d2 in d1:
                             for d3 in d2:
                                 if isinstance(d3, bs4.element.Tag):
-                                    if d3.get("class")[0] == "monthday":
+                                    if d3.get('class')[0] == 'monthday':
                                         # Store the date into a list of events and make a list of matches per event.
                                         event = Event(d3.string, [])
                                         listOfEvents.append(event)
-                    if d1.get("class")[0] == "EventMatch":
+                    if d1.get('class')[0] == 'EventMatch':
                         for d2 in d1:
                             for d3 in d2:
                                 if isinstance(d3, bs4.element.Tag):
-                                    if (d3.get("class")[0] == "EventTime"):
+                                    if (d3.get('class')[0] == 'EventTime'):
                                         # Store the match time.
                                         time = d3.find('span', class_='hour').string + " " \
                                                + d3.find('span', class_='ampm').string
@@ -104,18 +104,18 @@ async def scrape_schedule():
                                         # Store the match info: T1score | T2score | T1name | T2name.
                                         for d4 in d3:
                                             if isinstance(d4, bs4.element.Tag):
-                                                if (d4.get("class")[0] == "score"):
+                                                if (d4.get('class')[0] == 'score'):
                                                     t1s = d4.find('span', class_='scoreTeam1').string
                                                     t2s = d4.find('span', class_='scoreTeam2').string
-                                                if (len(d4.get("class")) > 1 and d4.get("class")[1] == "team1"):
+                                                if (len(d4.get('class')) > 1 and d4.get('class')[1] == 'team1'):
                                                     t1n = d4.find('span', class_='tricode').string
-                                                if (len(d4.get("class")) > 1 and d4.get("class")[1] == "team2"):
+                                                if (len(d4.get('class')) > 1 and d4.get('class')[1] == 'team2'):
                                                     t2n = d4.find('span', class_='tricode').string
-                            match = Match(time, t1s, t2s, t1n, t2n)
-                            # Check if any matches have been played and only add unplayed matches.
-                            event.played = (t1s != 0 or t2s != 0)
-                            if not event.played:
-                                event.appendMatch(match)
+                                        match = Match(time, t1s, t2s, t1n, t2n)
+                                        # Check if any matches have been played and only add unplayed matches.
+                                        event.played = (t1s != 0 or t2s != 0)
+                                        if not event.played:
+                                            event.appendMatch(match)
 
             driver.quit()
         else:
@@ -126,11 +126,32 @@ async def scrape_schedule():
 Check the list of events and notifies the guild.
 """
 @client.event
-async def game_reminder():
+async def match_reminder():
     while (True):
         await client.wait_until_ready()
 
+        # Check that the list is not empty
+        if not listOfEvents:
+            print("No events scheduled.")
+            await asyncio.sleep(864000)
+        else:
+            # Get the oldest event listed
+            currentEvent = listOfEvents.pop(0)
+
+            eventDate = datetime.strp(currentEvent.date, '%B %d')
+            today = datetime.datetime.now()
+
+            # Loop until the event is scheduled for today
+            while today.month != eventDate.month and today.day != eventDate.day:
+                await asyncio.sleep(864000)
+
+            for currentMatch in currentEvent.matches:
+                    # TODO: Loop until the match is being played soon
+                    # TODO: Send message on Discord
+                    
+                    currentMatch.printMatch()
+
 client.loop.create_task(scrape_schedule())
-client.loop.create_task(game_reminder())
+client.loop.create_task(match_reminder())
 
 client.run(TOKEN)
