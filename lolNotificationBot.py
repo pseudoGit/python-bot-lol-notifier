@@ -1,8 +1,9 @@
+#! python3
 # lolNotificationBot.py
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from dotenv import load_dotenv
-import os, discord, datetime, asyncio, requests, bs4
+import os, discord, datetime, asyncio, bs4
 
 """
 Event - A date and the list of matches on that date 
@@ -32,6 +33,9 @@ class Match:
         self.t1n = t1n
         self.t2n = t2n
     
+    def matchInfo(self):
+        return f"{self.time} - {self.t1n} vs {self.t2n}"
+
     def printMatch(self):
         print(f"{self.time} - {self.t1n}: {self.t1s} vs {self.t2n}: {self.t2s}")
 
@@ -51,7 +55,7 @@ async def on_ready():
     for guild in client.guilds:
         if guild.name == GUILD:
             break
-    print(f"{client.user} is connected to the following guild:\n"
+    print(f"{client.user} is connected to the following guild: "
           f"{guild.name}(id: {guild.id})")
 
 """
@@ -60,17 +64,19 @@ Scrape lol esports website for scheduled big region matches once a month.
 @client.event
 async def scrape_schedule():
     # Initialize the date since the bot last scraped.
-    lastScrapedDate = datetime.datetime.now() 
+    lastScrapedDate = datetime.datetime.utcfromtimestamp(0) 
 
     while (True):
         await client.wait_until_ready()
-
-        # Scrape if the bot has not already scraped this month and only on the 1st of each month.
+        # Scrape if the bot has not already scraped this month.
         today = datetime.datetime.now()
-        if (lastScrapedDate.year < today.year or lastScrapedDate.month < today.month) and (today.day == 1):
+        print("Waiting for scrape")
+        if lastScrapedDate.year < today.year or lastScrapedDate.month < today.month:
             # Update the date since the bot last scraped.
             lastScrapedDate = today
+
             # Clear the existing list of events
+            global listOfEvents 
             listOfEvents = []
 
             options = Options()
@@ -111,12 +117,12 @@ async def scrape_schedule():
                                                     t1n = d4.find('span', class_='tricode').string
                                                 if (len(d4.get('class')) > 1 and d4.get('class')[1] == 'team2'):
                                                     t2n = d4.find('span', class_='tricode').string
-                                        match = Match(time, t1s, t2s, t1n, t2n)
-                                        # Check if any matches have been played and only add unplayed matches.
-                                        event.played = (t1s != 0 or t2s != 0)
-                                        if not event.played:
-                                            event.appendMatch(match)
-
+                                        if d3.get('class')[0] == 'teams':
+                                            match = Match(time, t1s, t2s, t1n, t2n)
+                                            # Check if any matches have been played and only add unplayed matches.
+                                            event.played = (t1s != '0' or t2s != '0')
+                                            if not event.played:
+                                                event.appendMatch(match)
             driver.quit()
         else:
             # Sleep 1 day before checking again.
@@ -130,26 +136,36 @@ async def match_reminder():
     while (True):
         await client.wait_until_ready()
 
+        global listOfEvents
+
         # Check that the list is not empty
         if not listOfEvents:
-            print("No events scheduled.")
             await asyncio.sleep(864000)
         else:
             # Get the oldest event listed
             currentEvent = listOfEvents.pop(0)
 
-            eventDate = datetime.strp(currentEvent.date, '%B %d')
+            eventDate = datetime.datetime.strptime(currentEvent.date, '%B %d')
             today = datetime.datetime.now()
 
             # Loop until the event is scheduled for today
             while today.month != eventDate.month and today.day != eventDate.day:
                 await asyncio.sleep(864000)
 
+            # Loop through every match on the present event date
             for currentMatch in currentEvent.matches:
-                    # TODO: Loop until the match is being played soon
-                    # TODO: Send message on Discord
+                    # Loop until the match is being played soon, i.e. within 30 minutes of the start time.
+                    startTime = datetime.datetime.strptime(currentMatch.time, '%I %p')
+                    notifyTime = startTime - datetime.timedelta(minutes=30)
                     
-                    currentMatch.printMatch()
+                    while not (datetime.datetime.now().time() > notifyTime.time() and datetime.datetime.now().time() < startTime.time()):
+                        # Sleep for 15 minutes.
+                        await asyncio.sleep(900)
+
+                    # Send message on Discord
+                    channel = discord.utils.get(client.guilds[0].channels, name='general')
+                    announcement = "Match about to begin: " + currentMatch.matchInfo()
+                    await channel.send(content=announcement)
 
 client.loop.create_task(scrape_schedule())
 client.loop.create_task(match_reminder())
