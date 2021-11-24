@@ -55,7 +55,7 @@ async def on_ready():
     for guild in client.guilds:
         if guild.name == GUILD:
             break
-    print(f"{client.user} is connected to the following guild: "
+    print(f"{client.user} is connected to the following guild:\n"
           f"{guild.name}(id: {guild.id})")
 
 """
@@ -70,7 +70,6 @@ async def scrape_schedule():
         await client.wait_until_ready()
         # Scrape if the bot has not already scraped this month.
         today = datetime.datetime.now()
-        print("Waiting for scrape")
         if lastScrapedDate.year < today.year or lastScrapedDate.month < today.month:
             # Update the date since the bot last scraped.
             lastScrapedDate = today
@@ -145,10 +144,9 @@ async def match_reminder():
             # Get the oldest event listed
             currentEvent = listOfEvents.pop(0)
 
+            # Loop until the event is scheduled for today
             eventDate = datetime.datetime.strptime(currentEvent.date, '%B %d')
             today = datetime.datetime.now()
-
-            # Loop until the event is scheduled for today
             while today.month != eventDate.month and today.day != eventDate.day:
                 await asyncio.sleep(864000)
 
@@ -157,7 +155,6 @@ async def match_reminder():
                     # Loop until the match is being played soon, i.e. within 30 minutes of the start time.
                     startTime = datetime.datetime.strptime(currentMatch.time, '%I %p')
                     notifyTime = startTime - datetime.timedelta(minutes=30)
-                    
                     while not (datetime.datetime.now().time() > notifyTime.time() and datetime.datetime.now().time() < startTime.time()):
                         # Sleep for 15 minutes.
                         await asyncio.sleep(900)
