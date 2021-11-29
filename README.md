@@ -35,11 +35,6 @@ python3 lolNotificationBot.py
 ```
 
 ## Requirements
-<style type="text/css">
- ul {
-  list-style-type: none;
- }
-</style>
 - python3
 - pip3 install selenium
 - pip3 install python-dotenv
